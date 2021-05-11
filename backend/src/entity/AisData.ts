@@ -5,6 +5,9 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from "typeorm";
@@ -23,9 +26,11 @@ export default class AisData extends BaseEntity {
   @Column("timestamp with time zone")
   time: Date;
 
+  @Index()
   @Column("double precision")
   longitude: number;
 
+  @Index()
   @Column("double precision")
   latitude: number;
 
@@ -80,6 +85,12 @@ export default class AisData extends BaseEntity {
   @Column("point", { nullable: true })
   location: string;
 
+  @ManyToOne(() => Port, { onDelete: "NO ACTION" })
+  @JoinColumn({ name: "port_id" })
+  port_id: number;
+  @Column("int", { nullable: true })
+  port?: Port;
+
   @CreateDateColumn({
     type: "timestamp with time zone",
     default: () => "NOW()"
@@ -92,6 +103,7 @@ export default class AisData extends BaseEntity {
   })
   public updated_at: Date;
 
+  @Index()
   @Column({ nullable: true })
   destSlug: string;
   @BeforeInsert()
@@ -101,6 +113,7 @@ export default class AisData extends BaseEntity {
     this.destSlug = slugify(this.dest);
   }
 
+  @Index()
   @Column("timestamp", { nullable: true })
   etaDate: Date;
   @BeforeInsert()
@@ -113,18 +126,22 @@ export default class AisData extends BaseEntity {
     }
   }
 
-  private static getDestWhere(port: Port, idle: boolean) {
-    const portNameSlug = slugify(port.nameWoDiacritics);
-    const countrySlug = slugify(port.country);
-    const locationSlug = slugify(port.location);
+  private static getDestWhere(ports: Port[], idle: boolean = false) {
+    const wheres = ports.map(port => {
+      const portNameSlug = slugify(port.nameWoDiacritics);
+      const countrySlug = slugify(port.country);
+      const locationSlug = slugify(port.location);
 
-    let where = `"destSlug" LIKE '${portNameSlug}%'`;
-    where += ` OR "destSlug" LIKE '${countrySlug}-${locationSlug}%'`;
-    where += ` OR "destSlug" LIKE '${countrySlug}${locationSlug}%'`;
-    if (idle) {
-      where += ` OR "destSlug" IS NULL`;
-    }
-    return `(${where})`;
+      let where = `"destSlug" LIKE '${portNameSlug}%'`;
+      where += ` OR "destSlug" LIKE '${countrySlug}-${locationSlug}%'`;
+      where += ` OR "destSlug" LIKE '${countrySlug}${locationSlug}%'`;
+      if (idle) {
+        where += ` OR "destSlug" IS NULL`;
+      }
+      return `(${where})`;
+    });
+
+    return `(${wheres.join(" OR ")})`;
   }
 
   private static getEtaWhere(start: number, end: number, idle: boolean) {
@@ -136,33 +153,41 @@ export default class AisData extends BaseEntity {
     return `${startWhere} AND ${endWhere}`;
   }
 
-  static async search(params: {
-    portId: number;
-    type: string;
-    distance: number;
-    start: string;
-    end: string;
-    idle: string;
-  }): Promise<AisData[]> {
-    const port = await Port.findOneOrFail(params.portId);
-    const distance = `(point(longitude, latitude)<@>point(${port.longitude}, ${port.latitude})) * 1.609344`;
+  static async search(
+    port: Port[],
+    center: {
+      latitude: number;
+      longitude: number;
+    },
+    params: {
+      type?: string;
+      distance?: number;
+      start?: string;
+      end?: string;
+      idle?: string;
+    }
+  ): Promise<AisData[]> {
+    const distance = `(point(vessel.longitude, vessel.latitude)<@>point(${center.longitude}, ${center.latitude})) * 1.609344`;
+    // const distanceToPort = `(point(longitude, latitude)<@>point(${port.longitude}, ${port.latitude})) * 1.609344`;
     let q = this.createQueryBuilder("vessel")
       .select(distance, "distance")
-      .addSelect("id")
+      .leftJoinAndSelect("vessel.port_id", "port")
+      // .addSelect(distanceToPort, "distanceToPort")
+      .addSelect("vessel.id","id")
       .addSelect("mmsi")
       .addSelect("time")
-      .addSelect("longitude")
-      .addSelect("latitude")
+      .addSelect("vessel.longitude", "longitude")
+      .addSelect("vessel.latitude", "latitude")
       .addSelect("cog")
       .addSelect("sog")
-      .addSelect("name")
+      .addSelect("vessel.name","name")
       .addSelect("draught")
       .addSelect("dest")
       .addSelect("eta")
       .addSelect(`"etaDate"`)
       .addSelect("imo")
       .addSelect("type")
-      .addSelect("location");
+      .addSelect("vessel.location","location");
 
     q.where(this.getDestWhere(port, Boolean(Number(params.idle))));
     q.andWhere(
@@ -179,7 +204,13 @@ export default class AisData extends BaseEntity {
     }
 
     q.orderBy("distance", "ASC");
-    console.log(q.getSql());
     return q.getRawMany();
+  }
+
+  static async syncPortIds(port: Port) {
+    const where = this.getDestWhere([port]);
+    await this.query(
+      `UPDATE ais_data SET port_id=${port.id} WHERE ${where} AND port_id IS NULL`
+    );
   }
 }

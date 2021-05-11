@@ -79,9 +79,21 @@ const SearchCard = ({
       interval,
       includeIdle
     );
-    setLoading(false);
     console.log("vessels", vessels);
     setVessels(vessels);
+    let vesselsNearby = await API.searchVesselsNearby(
+      portId,
+      distance,
+      interval,
+      includeIdle
+    );
+    vesselsNearby = vesselsNearby.map(vessel => ({
+      ...vessel,
+      nearby: true
+    }));
+    console.log("vessels nearby", vesselsNearby);
+    setVessels([...vessels, ...vesselsNearby]);
+    setLoading(false);
   };
 
   // @ts-ignore
@@ -140,7 +152,7 @@ const SearchCard = ({
         </div>
       </Spin>
 
-      <VesselTable vessels={vessels} onClick={setSelectedVessel}/>
+      <VesselTable vessels={vessels} onClick={setSelectedVessel} />
     </Card>
   );
 };

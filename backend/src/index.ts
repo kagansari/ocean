@@ -12,6 +12,7 @@ import { Like } from "typeorm";
 import { slugify } from "./utils";
 import path from "path";
 import fs from "fs";
+import _ from "lodash";
 
 const upload = multer({ dest: "uploads/" });
 
@@ -67,19 +68,48 @@ const run = async () => {
   app.use(cookieParser());
 
   app.get("/VesselAvailabilitySearch", async (req, res) => {
+    const { portId, type, distance, start, end, idle } = req.query;
+    const port = await Port.findOneOrFail(Number(portId));
+    const center = {
+      latitude: port.latitude,
+      longitude: port.longitude
+    };
     // @ts-ignore
-    const data = await AisData.search(req.query);
+    const data = await AisData.search([port], center, req.query);
+
     res.json(data);
   });
 
-  app.post("/ProcessAIS", upload.single("file"), async (req, res,next) => {
+  app.get("/VesselAvailabilityNearby", async (req, res) => {
+    const { portId, type, distance, start, end } = req.query;
+    const port = await Port.findOneOrFail(Number(portId));
+    const center = {
+      latitude: port.latitude,
+      longitude: port.longitude
+    };
+
+    const adjacentPorts = await Port.findAdjacent(port, Number(distance));
+    if (adjacentPorts.length === 0) {
+      return res.json([]);
+    }
+
+    const dataNearBy = await AisData.search(adjacentPorts, center, {
+      ...req.query,
+      idle: "0"
+    });
+
+    // console.log(`${dataNearBy.length} data nearby found`);
+    res.json(dataNearBy);
+  });
+
+  app.post("/ProcessAIS", upload.single("file"), async (req, res, next) => {
     try {
       let raw = fs.readFileSync(req.file.path);
       // @ts-ignore
       JSON.parse(raw);
       res.sendStatus(200);
     } catch (err) {
-      return next(err)
+      return next(err);
     }
 
     await DB.syncAIS(req.file.path);
@@ -98,17 +128,21 @@ const run = async () => {
     res.json({ count, items: ports });
   });
 
-  app.post("/sync", async function(req, res) {
-    await DB.conn.dropDatabase();
-    await DB.conn.synchronize();
-    await DB.syncPorts();
-    await DB.syncAIS(path.join(__dirname, "../../mock/ais.json"));
-  });
   app.post("/syncPorts", async function(req, res) {
     await DB.syncPorts();
   });
   app.post("/syncAIS", async function(req, res) {
     await DB.syncAIS(path.join(__dirname, "../../mock/ais.json"));
+  });
+
+  app.post("/syncPortIds", async function(req, res) {
+    const ports = await Port.find({ where: { function: Like("1%") } });
+
+    for (const port of ports) {
+      await AisData.syncPortIds(port);
+      console.log(`updated data for ${port.name}`);
+    }
+    return ports;
   });
 
   // @ts-ignore

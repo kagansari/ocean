@@ -5,10 +5,11 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Like,
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from "typeorm";
-import {slugify} from "../utils";
+import { slugify } from "../utils";
 
 const getLatLngFromStr = (coordinateStr: string) => {
   const latitudeNumber = Number(coordinateStr.slice(0, 4)) / 100;
@@ -91,6 +92,30 @@ export default class Port extends BaseEntity {
   @BeforeInsert()
   @BeforeUpdate()
   async setSlug() {
-    this.slug = slugify(`${this.country}-${this.location}-${this.nameWoDiacritics}`);
+    this.slug = slugify(
+      `${this.country}-${this.location}-${this.nameWoDiacritics}`
+    );
+  }
+
+  static async findAdjacent(port: Port, distance: number): Promise<Port[]> {
+    console.log({ port, distance });
+    const distanceQuery = `(point(longitude, latitude)<@>point(${port.longitude}, ${port.latitude})) * 1.609344`;
+
+    return this.createQueryBuilder("port")
+      .select(distanceQuery, "distance")
+      .addSelect("country")
+      .addSelect("location")
+      .addSelect("name")
+      .addSelect('"nameWoDiacritics"')
+      .addSelect("subdivison")
+      .addSelect("status")
+      .addSelect("longitude")
+      .addSelect("latitude")
+      .addSelect("function")
+      .where({ function: Like("1%") })
+      .andWhere(`${distanceQuery} <= ${distance}`)
+      .andWhere(`${distanceQuery} > 0`)
+      .orderBy("distance", "ASC")
+      .getRawMany();
   }
 }

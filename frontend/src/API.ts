@@ -25,13 +25,16 @@ export type Vessel = {
   id: number;
   latitude: number;
   location?: number;
-  longitude: number;
+  longitude?: number;
   mmsi: number;
   name: string;
   sog: number;
   time: string;
   imo: number;
   type: number;
+  nearby?: boolean;
+  port_latitude?: number;
+  port_longitude?: number;
 };
 
 export default class API {
@@ -69,6 +72,24 @@ export default class API {
 
     const res = await axios.get(
       `${API_URL}/VesselAvailabilitySearch?${query}&${timeQuery}`
+    );
+
+    return res.data;
+  }
+
+  static async searchVesselsNearby(
+    portId: number,
+    distance: number,
+    interval: [Moment, Moment],
+    idle: boolean
+  ): Promise<Vessel[]> {
+    const timeQuery = `start=${interval[0].valueOf()}&end=${interval[1].valueOf()}`;
+    const query = `type=tanker&portId=${portId}&distance=${distance}&idle=${
+      idle ? 1 : 0
+    }`;
+
+    const res = await axios.get(
+      `${API_URL}/VesselAvailabilityNearby?${query}&${timeQuery}`
     );
 
     return res.data;
