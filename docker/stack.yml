@@ -23,10 +23,10 @@ services:
       replicas: 1
 
   frontend:
-    image: ocean-frontend:4
+    image: ocean-frontend:5
 
   api:
-    image: ocean-backend:2
+    image: ocean-backend:3
     ports:
       - 3000:3000
     volumes:
