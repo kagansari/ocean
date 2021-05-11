@@ -14,6 +14,7 @@ import moment, { Moment } from "moment";
 import VesselTable from "./VesselTable";
 import PortSelect from "./PortSelect";
 import VesselUpload from "./VesselUpload";
+import ShipTypeSelect from "./ShipTypeSelect";
 
 /**
  * https://gist.github.com/codeguy/6684588
@@ -69,6 +70,8 @@ const SearchCard = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [distance, setDistance] = useState<number>(1000);
   const [includeIdle, setIncludeIdle] = useState<boolean>(true);
+  const [includeNearby, setIncludeNearby] = useState<boolean>(true);
+  const [shipType, setShipType] = useState<string>("tanker");
 
   const handleSubmit = async () => {
     if (!portId) return console.error("No port selected!");
@@ -77,22 +80,26 @@ const SearchCard = ({
       portId,
       distance,
       interval,
-      includeIdle
+      includeIdle,
+      shipType
     );
     console.log("vessels", vessels);
     setVessels(vessels);
-    let vesselsNearby = await API.searchVesselsNearby(
-      portId,
-      distance,
-      interval,
-      includeIdle
-    );
-    vesselsNearby = vesselsNearby.map(vessel => ({
-      ...vessel,
-      nearby: true
-    }));
-    console.log("vessels nearby", vesselsNearby);
-    setVessels([...vessels, ...vesselsNearby]);
+    if (includeNearby) {
+      let vesselsNearby = await API.searchVesselsNearby(
+        portId,
+        distance,
+        interval,
+        includeIdle,
+        shipType
+      );
+      vesselsNearby = vesselsNearby.map(vessel => ({
+        ...vessel,
+        nearby: true
+      }));
+      console.log("vessels nearby", vesselsNearby);
+      setVessels([...vessels, ...vesselsNearby]);
+    }
     setLoading(false);
   };
 
@@ -111,8 +118,8 @@ const SearchCard = ({
           <DateRangeSelect value={interval} onChange={setInterval} />
           <br />
           <br />
-          <Row align={"middle"} gutter={16} justify={"space-between"}>
-            <Col className={"flex"}>
+          <Row align={"middle"} gutter={[16, 16]} justify={"space-between"}>
+            <Col className={"flex"} span={12}>
               <InputNumber
                 min={0}
                 style={{ minWidth: 100 }}
@@ -128,12 +135,23 @@ const SearchCard = ({
                 km
               </Card>
             </Col>
-            <Col>
+            <Col span={12}>
               <Checkbox
                 checked={includeIdle}
                 onChange={e => setIncludeIdle(e.target.checked)}
               >
-                Include Idle Vessels
+                Idle Vessels
+              </Checkbox>
+            </Col>
+            <Col span={12}>
+              <ShipTypeSelect value={shipType} onChange={setShipType} />
+            </Col>
+            <Col span={12}>
+              <Checkbox
+                checked={includeNearby}
+                onChange={e => setIncludeNearby(e.target.checked)}
+              >
+                Nearby Vessels
               </Checkbox>
             </Col>
           </Row>

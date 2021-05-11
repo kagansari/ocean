@@ -63,10 +63,11 @@ export default class API {
     portId: number,
     distance: number,
     interval: [Moment, Moment],
-    idle: boolean
+    idle: boolean,
+    type: string = "tanker"
   ): Promise<Vessel[]> {
     const timeQuery = `start=${interval[0].valueOf()}&end=${interval[1].valueOf()}`;
-    const query = `type=tanker&portId=${portId}&distance=${distance}&idle=${
+    const query = `type=${type}&portId=${portId}&distance=${distance}&idle=${
       idle ? 1 : 0
     }`;
 
@@ -81,10 +82,11 @@ export default class API {
     portId: number,
     distance: number,
     interval: [Moment, Moment],
-    idle: boolean
+    idle: boolean,
+    type: string = "tanker",
   ): Promise<Vessel[]> {
     const timeQuery = `start=${interval[0].valueOf()}&end=${interval[1].valueOf()}`;
-    const query = `type=tanker&portId=${portId}&distance=${distance}&idle=${
+    const query = `type=${type}&portId=${portId}&distance=${distance}&idle=${
       idle ? 1 : 0
     }`;
 

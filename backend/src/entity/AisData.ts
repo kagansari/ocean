@@ -144,6 +144,44 @@ export default class AisData extends BaseEntity {
     return `(${wheres.join(" OR ")})`;
   }
 
+  private static getTypeWhere(type: string) {
+    switch (type) {
+      case "tanker":
+        return `type >= 80 AND type <= 89`;
+      case "wig":
+        return `type >= 20 AND type <= 29`;
+      case "fishing":
+        return `type = 30`;
+      case "towing":
+        return `type >= 31 AND type <= 32`;
+      case "hsc":
+        return `type >= 40 AND type <= 49`;
+      case "passenger":
+        return `type >= 60 AND type <= 69`;
+      case "cargo":
+        return `type >= 70 AND type <= 79`;
+      case "tug":
+        return `type = 52`;
+      case "search":
+        return `type = 51`;
+      case "dredging":
+        return `type = 33`;
+      case "diving":
+        return `type = 34`;
+      case "military":
+        return `type = 35`;
+      case "pollution":
+        return `type = 54`;
+      case "law":
+        return `type = 55`;
+      case "other":
+        return `type >= 90 AND type <= 99`;
+      default:
+        console.error(`INVALID TYPE ${type}`);
+        return ""
+    }
+  }
+
   private static getEtaWhere(start: number, end: number, idle: boolean) {
     const startWhere = `"etaDate" >= '${moment(start).format()}'`;
     const endWhere = `"etaDate" <= '${moment(end).format()}'`;
@@ -173,21 +211,21 @@ export default class AisData extends BaseEntity {
       .select(distance, "distance")
       .leftJoinAndSelect("vessel.port_id", "port")
       // .addSelect(distanceToPort, "distanceToPort")
-      .addSelect("vessel.id","id")
+      .addSelect("vessel.id", "id")
       .addSelect("mmsi")
       .addSelect("time")
       .addSelect("vessel.longitude", "longitude")
       .addSelect("vessel.latitude", "latitude")
       .addSelect("cog")
       .addSelect("sog")
-      .addSelect("vessel.name","name")
+      .addSelect("vessel.name", "name")
       .addSelect("draught")
       .addSelect("dest")
       .addSelect("eta")
       .addSelect(`"etaDate"`)
       .addSelect("imo")
       .addSelect("type")
-      .addSelect("vessel.location","location");
+      .addSelect("vessel.location", "location");
 
     q.where(this.getDestWhere(port, Boolean(Number(params.idle))));
     q.andWhere(
@@ -199,8 +237,8 @@ export default class AisData extends BaseEntity {
     );
     q.andWhere(`${distance} <= ${params.distance}`);
 
-    if (params.type === "tanker") {
-      q.andWhere(`type >= 80 AND type <= 89`);
+    if (params.type) {
+      q.andWhere(this.getTypeWhere(params.type));
     }
 
     q.orderBy("distance", "ASC");
